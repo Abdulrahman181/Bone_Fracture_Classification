@@ -1,0 +1,11 @@
+# Dataset and locally generated artifacts
+/Dataset/
+*.keras
+*.h5
+*.pickle
+
+# Python and Jupyter runtime files
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
