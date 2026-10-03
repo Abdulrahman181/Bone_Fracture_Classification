@@ -1,10 +1,10 @@
 # Bone Fracture Classification
 
-An educational TensorFlow/Keras notebook prototype for binary classification of bone X-ray images. **It is not a medical device and must not be used for diagnosis, triage, or treatment decisions.** No clinical validation is provided or implied.
+An educational TensorFlow/Keras notebook prototype for binary classification of bone X-ray images. **It is not a medical device and must not be used for diagnosis, triage, treatment, or any clinical decision.** No clinical validation, external validation, dataset provenance, or performance result is provided or implied.
 
 ## Repository contents and data
 
-The repository contains the notebook only; the dataset and trained model are not included. The notebook expects you to obtain a dataset separately and place it in this layout, with the class directory names shown exactly:
+The repository contains the notebook, reusable input-validation utilities, and tests. It does not include a dataset or trained model. Obtain data separately and place it in this exact directory structure (class names and spelling are significant):
 
 ```text
 Dataset/
@@ -19,11 +19,13 @@ Dataset/
     └── not fractured/
 ```
 
-Each class directory should contain `.jpg` images. Use only data you are authorized to access and process. The dataset's source, license, patient-level split design, label quality, and de-identification status are not documented here; verify those independently before use. Do not add patient data, credentials, generated models, or dataset contents to Git. The repository has no license file, so do not assume permission to redistribute its code or any data.
+Put `.jpg` or `.jpeg` files directly inside each class directory. The loader rejects missing/empty splits, unexpected directory entries, symlinks, malformed images, and byte-identical files shared across splits. It reports aggregate counts only and uses a fixed class mapping (`fractured: 0`, `not fractured: 1`). Images are decoded in batches rather than accumulated as full NumPy arrays.
+
+These checks **do not verify patient/study-level separation**, detect near-duplicates, establish label quality, or validate data provenance, licensing, de-identification, or external validity. Those require independent dataset records and review; exact-file duplicate detection is only a limited guard. Use only data you are authorized to access and process. Do not commit images, credentials, patient information, notebook outputs, or generated model files. This repository has no license file; do not assume redistribution rights for the code or any dataset.
 
 ## Environment and run instructions
 
-The pinned requirements target **Python 3.10 or 3.11**. From the repository root:
+Pinned runtime dependencies target **Python 3.10 or 3.11**. From the repository root:
 
 ```bash
 python -m venv .venv
@@ -35,20 +37,23 @@ python -m pip install -r requirements.txt
 jupyter lab Bone_Fracture_Classification.ipynb
 ```
 
-Select the environment's Python kernel and run the notebook from top to bottom. The dataset must be present under `Dataset/` relative to the repository root. The notebook does not download data. On a CPU-only computer, TensorFlow training may be slow; no execution time or hardware requirement has been validated here.
+Run the notebook top to bottom with the environment's Python kernel. By default it reads `Dataset/` relative to the working directory; set `BONE_FRACTURE_DATA` to use another local data root. Set `BONE_FRACTURE_ARTIFACT_DIR` to change the output directory (default `artifacts/`). The notebook does not download data. TensorFlow training may be slow or memory-intensive on CPU; no hardware or runtime benchmark is claimed.
 
-Run repository-level static checks without installing the ML dependencies:
+Run tests and Python static compilation with:
 
 ```bash
 python -m unittest discover -s tests -v
+python -m compileall -q bone_fracture tests
 ```
 
-## Evaluation boundaries
+GitHub Actions installs the pinned requirements and runs these checks on Python 3.10 and 3.11.
 
-The notebook applies the same `/255` rescaling layer inside the model to training, validation, and test inputs. Training uses only `train/`; `val/` is passed as `validation_data`; the test split is used only in the final `model.evaluate` call. The notebook saves the locally generated model as `Bone-fracture.keras`, which is ignored by Git.
+## Training and evaluation
 
-The saved notebook outputs were cleared, and no new training or evaluation was performed for this change. There are no reproduced performance results. Before treating any future metric as meaningful, establish dataset provenance and licensing, verify de-identification, confirm patient/study-level separation and absence of split leakage, and run the full experiment in a documented environment. Accuracy alone is not evidence of clinical performance.
+The notebook seeds Python/TensorFlow, enables deterministic TensorFlow operations, and uses batched directory datasets. The same model-embedded `/255` rescaling layer processes every split. Only `train/` is used by `model.fit`; `val/` controls early stopping with restoration of the best validation-loss weights; `test/` is evaluated exactly once at the end. Test results are aggregate values for that local run only and are not clinical or external validation.
 
-## Security and privacy
+The model is saved locally as `bone-fracture.keras`, with `bone-fracture.metadata.json` containing a versioned input/class/preprocessing schema and model SHA-256 checksum. Both are ignored by Git. The saved notebook has no cached outputs. No dataset-backed training, test evaluation, or metric reproduction was performed for this repository change.
 
-Notebook outputs are intentionally not committed because they included embedded medical images and stale run results. Dataset files and model artifacts are excluded by `.gitignore`. Do not load pickle files from untrusted sources; the notebook no longer writes or loads pickle artifacts. A scan of the current notebook and available repository history found no Kaggle credential or common access-token indicators. This scan cannot establish whether any credential was exposed elsewhere or in an external copy; if you have ever shared a Kaggle token, revoke it in Kaggle and create a replacement yourself.
+## Security, privacy, and safety
+
+Input errors avoid including filenames in user-facing validation messages. The notebook displays only aggregate class counts and does not embed data outputs in the committed file. Model sidecar metadata contains no dataset paths, image names, patient records, or sample metrics. Model artifacts are treated as local, untrusted outputs; do not load artifacts obtained from untrusted sources. If a credential was ever shared or exposed outside this repository, revoke it with its provider and rotate any dependent credentials.

@@ -30,21 +30,23 @@ class NotebookIntegrityTests(unittest.TestCase):
                 self.assertFalse(cell.get("outputs", []))
                 self.assertIsNone(cell.get("execution_count"))
 
-    def test_preprocessing_is_inside_model_for_all_splits(self):
+    def test_all_splits_share_model_preprocessing_and_fixed_class_mapping(self):
         self.assertRegex(self.code, r"Rescaling\(1\.0\s*/\s*255")
-        self.assertIn("x_test = np.asarray(x_test, dtype=np.uint8)", self.code)
-        self.assertIn("x_pred = np.asarray(x_pred, dtype=np.uint8)", self.code)
+        self.assertIn("CLASS_NAMES", self.code)
+        self.assertIn("load_datasets", self.code)
+        self.assertIn("tf.keras.utils.set_random_seed(SEED)", self.code)
 
-    def test_validation_is_used_and_test_is_not_used_for_training(self):
+    def test_training_uses_only_train_and_validation_and_test_is_evaluated_once(self):
         fit_calls = re.findall(r"model\.fit\s*\((.*?)\)", self.code, flags=re.DOTALL)
         self.assertEqual(len(fit_calls), 1)
-        self.assertIn("x_train", fit_calls[0])
-        self.assertRegex(self.code, r"validation_data\s*=\s*\(x_pred,\s*y_true_pred\)")
-        self.assertNotIn("x_test", fit_calls[0])
-        self.assertNotIn("y_test", fit_calls[0])
+        self.assertIn('datasets["train"]', fit_calls[0])
+        self.assertIn('datasets["val"]', fit_calls[0])
+        self.assertNotIn('datasets["test"]', fit_calls[0])
+        self.assertEqual(self.code.count('model.evaluate(datasets["test"]'), 1)
 
-    def test_test_split_is_only_evaluated_once_and_pickle_is_absent(self):
-        self.assertEqual(self.code.count("model.evaluate(x_test, y_test)"), 1)
+    def test_artifacts_have_explicit_schema_and_pickle_is_absent(self):
+        self.assertIn("write_model_manifest", self.code)
+        self.assertIn("MODEL_FILENAME", self.code)
         self.assertNotIn("pickle", self.code.lower())
 
 
