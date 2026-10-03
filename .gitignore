@@ -1,0 +1,19 @@
+# Dataset and locally generated artifacts
+/Dataset/
+/artifacts/
+*.keras
+*.metadata.json
+*.keras.tmp
+*.h5
+*.pickle
+
+# Python and Jupyter runtime files
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+.pytest_cache/
+.coverage
+build/
+dist/
+*.egg-info/

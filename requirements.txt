@@ -1,0 +1,7 @@
+# Python 3.10 or 3.11
+ipykernel==6.29.5
+jupyterlab==4.2.5
+matplotlib==3.8.4
+numpy==1.26.4
+pillow==10.4.0
+tensorflow==2.15.1
