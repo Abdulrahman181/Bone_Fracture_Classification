@@ -1,0 +1,9 @@
+data/
+*.h5
+*.keras
+*.pkl
+*.pickle
+*.joblib
+__pycache__/
+.ipynb_checkpoints/
+.venv/
