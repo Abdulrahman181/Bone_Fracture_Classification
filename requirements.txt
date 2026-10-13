@@ -1,6 +1,5 @@
-numpy
-pandas
-opencv-python
-matplotlib
-tqdm
-tensorflow
+numpy>=1.23,<2.1
+matplotlib>=3.7,<4
+scikit-learn>=1.2,<2
+tensorflow>=2.15,<2.19
+jupyter>=1,<2

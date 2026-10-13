@@ -7,3 +7,7 @@ data/
 __pycache__/
 .ipynb_checkpoints/
 .venv/
+.pytest_cache/
+artifacts/
+*.png
+*.csv
