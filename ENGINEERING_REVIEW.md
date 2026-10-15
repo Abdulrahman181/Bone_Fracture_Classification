@@ -41,6 +41,8 @@ The class order is deterministic (alphabetical), the random seed is configurable
 - `Bone_Fracture_Classification.ipynb` — rewritten into a validated, reproducible train/validation/test workflow; outputs cleared.
 - `README.md` — documented data contract, execution, validation, limitations, and no-fabricated-results policy.
 - `requirements.txt` — aligned dependencies and bounded major-version compatibility.
+- `requirements-dev.txt` — declared optional pytest and Ruff tooling.
+- `tests/test_validate_repo.py` — added regression coverage for notebook hygiene and leakage-pattern checks.
 - `.gitignore` — added local artifacts, caches, plots, and generated CSV exclusions.
 - `validate_repo.py` — added dependency-free static repository validation.
 - `ENGINEERING_REVIEW.md` — this review report.
@@ -58,3 +60,37 @@ The class order is deterministic (alphabetical), the random seed is configurable
 - Installing TensorFlow and supplying a licensed dataset are prerequisites for an end-to-end run.
 - The dependency bounds are intended for a normal Python 3 environment, but exact lockfiles are not added because the repository has no tested runtime matrix.
 - The model is a small baseline CNN, not a clinically validated model; threshold calibration, subgroup analysis, external validation, and governance remain out of scope.
+
+## Second Senior Review
+
+**Review date:** 2026-10-15
+
+### Findings
+
+The first review addressed the original test-set fitting, inconsistent preprocessing, implicit class mapping, missing split validation, stale notebook outputs, and non-portable paths. This second pass re-read every tracked file, inspected the complete Git history and prior diffs, and rechecked every notebook/code cell. The remaining material issues were:
+
+1. Dataset validation detected exact path reuse but not duplicated image content copied to different paths across splits, leaving a common form of file-level leakage undetected.
+2. The notebook saved a model checkpoint but did not verify that the serialized artifact could be loaded before reporting test results, and it did not persist the class order/preprocessing contract needed to interpret the artifact outside the notebook.
+3. Positive integer environment settings were not validated early, so values such as `0`, negatives, or non-integers produced less actionable downstream errors.
+4. The repository validator checked only the named notebook and did not reject non-null execution counts or malformed cell source structures; there were no regression tests for those checks.
+
+### Remediation
+
+- Added SHA-256 content-overlap detection between dataset splits while retaining exact resolved-path checks.
+- Added positive integer parsing for seed, batch size, and epoch settings with clear errors.
+- Added metadata JSON output containing class order, image size, seed, and batch size; the notebook now reloads the saved `.keras` artifact before test evaluation and writes the actual test report/metrics only after a real run.
+- Hardened `validate_repo.py` to inspect every notebook, validate notebook cell structures, reject stale execution counts, and detect `model.fit(test_ds)`-style patterns.
+- Added `tests/test_validate_repo.py` and `requirements-dev.txt`, plus README instructions for the test/lint workflow.
+- No data, metrics, or synthetic model outputs were added. No end-to-end training claim is made because this checkout has no dataset and TensorFlow is not installed.
+
+### Second-pass validation and limitations
+
+- `python3 validate_repo.py` passed.
+- `python3 -m compileall -q .` passed.
+- `ruff check . --output-format concise` passed.
+- `python3 -m pytest -q` passed for the new dependency-free regression tests.
+- `python3 -m pip install --dry-run --ignore-installed -r requirements.txt` resolved successfully to a compatible TensorFlow 2.18.1 dependency set without installing packages.
+- `git diff --check` passed.
+- Notebook JSON contains 10 cells, zero outputs, and null execution counts; all code cells parse and compile.
+- TensorFlow and the dataset remain unavailable in this environment, so image decoding, model training, checkpoint serialization, and real metric generation were not executed.
+- Content hashes detect byte-identical files, not transformed/visually duplicate images; patient-level independence still requires trusted identifiers and group-aware splitting.

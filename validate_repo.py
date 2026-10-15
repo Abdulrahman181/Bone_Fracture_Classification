@@ -15,7 +15,10 @@ NOTEBOOK = ROOT / "Bone_Fracture_Classification.ipynb"
 REQUIRED_FILES = (ROOT / "README.md", ROOT / "requirements.txt", NOTEBOOK)
 BANNED_PATTERNS = (
     (re.compile(r"/content/|/kaggle/|[A-Za-z]:\\\\"), "non-portable hard-coded path"),
-    (re.compile(r"model\.fit\s*\(\s*(?:x_)?test"), "test data passed to model.fit"),
+    (
+        re.compile(r"model\.fit\s*\(\s*(?:x_)?test(?:_ds)?\b"),
+        "test data passed to model.fit",
+    ),
 )
 
 
@@ -40,16 +43,31 @@ def check_notebook(path: Path, failures: list[str]) -> None:
         return
     if notebook.get("nbformat", 0) < 4:
         fail(f"{path.name}: unsupported nbformat", failures)
-    for index, cell in enumerate(notebook.get("cells", [])):
+    cells = notebook.get("cells")
+    if not isinstance(cells, list):
+        fail(f"{path.name}: cells must be a list", failures)
+        return
+    for index, cell in enumerate(cells):
+        if not isinstance(cell, dict):
+            fail(f"{path.name} cell {index}: cell must be an object", failures)
+            continue
         if cell.get("cell_type") != "code":
             continue
         if cell.get("outputs"):
             fail(f"{path.name} cell {index}: stale outputs are committed", failures)
-        source = "".join(cell.get("source", []))
+        if cell.get("execution_count") is not None:
+            fail(f"{path.name} cell {index}: execution count is not cleared", failures)
+        source_lines = cell.get("source", [])
+        if not isinstance(source_lines, list) or not all(
+            isinstance(line, str) for line in source_lines
+        ):
+            fail(f"{path.name} cell {index}: source must be a list of strings", failures)
+            continue
+        source = "".join(source_lines)
         try:
             ast.parse(source, filename=f"{path.name} cell {index}")
             compile(source, f"{path.name} cell {index}", "exec")
-        except SyntaxError as exc:
+        except (SyntaxError, ValueError, TypeError) as exc:
             fail(f"{path.name} cell {index}: {exc}", failures)
         for pattern, description in BANNED_PATTERNS:
             if pattern.search(source):
@@ -64,16 +82,22 @@ def main() -> int:
     for path in sorted(ROOT.rglob("*.py")):
         if ".git" not in path.parts and ".venv" not in path.parts:
             check_python(path, failures)
-    if NOTEBOOK.is_file():
-        check_notebook(NOTEBOOK, failures)
-        source = "\n".join(
-            "".join(cell.get("source", []))
-            for cell in json.loads(NOTEBOOK.read_text(encoding="utf-8")).get("cells", [])
-            if cell.get("cell_type") == "code"
-        )
-        for pattern, description in BANNED_PATTERNS:
-            if pattern.search(source):
-                fail(f"{NOTEBOOK.name}: {description}", failures)
+    notebooks = sorted(ROOT.rglob("*.ipynb"))
+    for notebook_path in notebooks:
+        if ".git" not in notebook_path.parts and ".venv" not in notebook_path.parts:
+            check_notebook(notebook_path, failures)
+            try:
+                notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+                source = "\n".join(
+                    "".join(cell.get("source", []))
+                    for cell in notebook.get("cells", [])
+                    if isinstance(cell, dict) and cell.get("cell_type") == "code"
+                )
+            except (OSError, json.JSONDecodeError, TypeError):
+                continue
+            for pattern, description in BANNED_PATTERNS:
+                if pattern.search(source):
+                    fail(f"{notebook_path.relative_to(ROOT)}: {description}", failures)
     if failures:
         print("STATIC VALIDATION FAILED")
         print("\n".join(f"- {failure}" for failure in failures))
